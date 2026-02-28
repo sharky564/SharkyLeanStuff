@@ -4,7 +4,7 @@ import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
 import Mathlib.Analysis.Calculus.Deriv.Slope
 
-open Complex Topology Function
+open Complex Topology Function MeasureTheory
 
 noncomputable def g (z : ℂ) : ℂ := exp (I * z) / (z + I)
 
@@ -299,3 +299,91 @@ lemma integral_inv_sub_I (R : ℝ) (hR : 1 < R) :
   rw [h_right_I, h_left_I]
   rw [int_bottom R, int_top R hR, int_right R hR, int_left R hR]
   exact log_identity R hR
+
+lemma rectIntegral_add {z w : ℂ} {f1 f2 : ℂ → ℂ}
+    (h1B : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑z.im * I)) volume z.re w.re)
+    (h2B : IntervalIntegrable (fun x : ℝ ↦ f2 (↑x + ↑z.im * I)) volume z.re w.re)
+    (h1T : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑w.im * I)) volume z.re w.re)
+    (h2T : IntervalIntegrable (fun x : ℝ ↦ f2 (↑x + ↑w.im * I)) volume z.re w.re)
+    (h1R : IntervalIntegrable (fun y : ℝ ↦ f1 (↑w.re + ↑y * I)) volume z.im w.im)
+    (h2R : IntervalIntegrable (fun y : ℝ ↦ f2 (↑w.re + ↑y * I)) volume z.im w.im)
+    (h1L : IntervalIntegrable (fun y : ℝ ↦ f1 (↑z.re + ↑y * I)) volume z.im w.im)
+    (h2L : IntervalIntegrable (fun y : ℝ ↦ f2 (↑z.re + ↑y * I)) volume z.im w.im) :
+    rectIntegral (fun z ↦ f1 z + f2 z) z w = rectIntegral f1 z w + rectIntegral f2 z w := by
+  unfold rectIntegral
+  rw [intervalIntegral.integral_add h1B h2B]
+  rw [intervalIntegral.integral_add h1T h2T]
+  rw [intervalIntegral.integral_add h1R h2R]
+  rw [intervalIntegral.integral_add h1L h2L]
+  simp only [smul_eq_mul]
+  ring
+
+lemma rectIntegral_const_mul {z w : ℂ} (f1 : ℂ → ℂ) (c : ℂ) :
+    rectIntegral (fun z ↦ c * f1 z) z w = c * rectIntegral f1 z w := by
+  unfold rectIntegral
+  simp only [intervalIntegral.integral_const_mul, smul_eq_mul]
+  ring
+
+macro "no_poles_in_domain" : tactic => `(tactic|
+· intro var _ contra
+  have hre := congrArg Complex.re contra
+  have him := congrArg Complex.im contra
+  simp only [add_re, add_im, sub_re, sub_im, neg_re, neg_im, mul_re, mul_im, ofReal_re, ofReal_im,
+    I_re, I_im, zero_re, zero_im, mul_zero, mul_one, zero_mul, one_mul, add_zero, zero_add,
+    sub_zero, zero_sub, neg_zero, sub_self] at hre him
+  linarith
+)
+
+lemma contour_integral_f (R : ℝ) (hR : 1 < R) :
+    rectIntegral f (zR R) (wR R) = ↑Real.pi / Real.exp 1 := by
+  have h_add : rectIntegral f (zR R) (wR R) =
+      rectIntegral (fun z ↦ (f z - g I * (1 / (z - I)))) (zR R) (wR R) +
+      rectIntegral (fun z ↦ g I * (1 / (z - I))) (zR R) (wR R) := by
+    have h_sum : f = fun z ↦ (f z - g I * (1 / (z - I))) + g I * (1 / (z - I)) := by ext z; ring
+    conv_lhs => rw [h_sum]
+    apply rectIntegral_add
+    all_goals
+    · apply ContinuousOn.intervalIntegrable
+      try unfold f
+      unfold g zR wR
+      simp only [neg_im, ofReal_im, neg_zero, ofReal_zero, zero_mul, add_zero, zero_add, I_mul_I,
+      one_div, neg_re, ofReal_re, add_re, mul_re, I_re, mul_zero, I_im, mul_one, sub_self, add_im,
+      im_ofReal_mul]
+      fun_prop (disch := no_poles_in_domain)
+  have h_f1_eq_h : rectIntegral (fun z ↦ f z - g I * (1 / (z - I))) (zR R) (wR R) =
+      rectIntegral h (zR R) (wR R) := by
+    unfold rectIntegral zR wR
+    refine congr_arg₂ Sub.sub (congr_arg₂ Add.add (congr_arg₂ Sub.sub ?_ ?_) ?_) ?_
+    all_goals
+      try apply congr_arg (HSMul.hSMul I)
+      apply intervalIntegral.integral_congr
+      intro x _
+      unfold h
+      dsimp only
+      split_ifs with contra
+      · have him := congrArg Complex.im contra
+        have hre := congrArg Complex.re contra
+        simp only [neg_im, ofReal_im, add_im, im_ofReal_mul, I_im, zero_add, neg_zero, add_re,
+          mul_re, I_re, mul_zero, mul_one, sub_self, add_zero, neg_re, ofReal_re, ofReal_neg,
+          neg_eq_zero] at him hre
+        linarith
+      · ring
+  rw [h_f1_eq_h] at h_add
+  rw [h_add]
+  rw [integral_h_eq_zero R hR]
+  rw [rectIntegral_const_mul]
+  rw [integral_inv_sub_I R hR]
+  rw [g_I]
+  have h_pi : (Real.exp (-1) / (2 * I)) * (2 * ↑Real.pi * I) = ↑Real.pi / Real.exp 1 := by
+    calc (Real.exp (-1) / (2 * I)) * (2 * ↑Real.pi * I)
+      _ = Real.exp (-1) * ↑Real.pi * (2 * I) / (2 * I) := by ring
+      _ = Real.exp (-1) * ↑Real.pi := by
+        rw [mul_div_cancel_right₀]
+        norm_num
+      _ = ↑Real.pi / Real.exp 1 := by
+        rw [Real.exp_neg]
+        simp only [ofReal_inv]
+        ring
+  push_cast at h_pi ⊢
+  rw [zero_add]
+  exact h_pi
