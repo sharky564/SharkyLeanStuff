@@ -618,11 +618,10 @@ lemma integrable_cos_div : Integrable (fun x : ℝ ↦ Real.cos x / (x^2 + 1)) :
 theorem lebesgue_integral_cos_div_sq_add_one :
     ∫ x : ℝ, Real.cos x / (x^2 + 1) = Real.pi / Real.exp 1 := by
   have h_CPV := integral_cpv_cos_div_sq_add_one
-
   have h_Lebesgue : Tendsto (fun R : ℝ ↦ ∫ x in -R..R, Real.cos x / (x^2 + 1))
       atTop (𝓝 (∫ x : ℝ, Real.cos x / (x^2 + 1))) := by
     apply intervalIntegral_tendsto_integral
     · exact integrable_cos_div
     · exact tendsto_neg_atTop_atBot
-    · exact?
+    · exact tendsto_id
   exact tendsto_nhds_unique h_Lebesgue h_CPV
