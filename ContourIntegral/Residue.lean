@@ -1,12 +1,65 @@
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
 import Mathlib.Analysis.Asymptotics.Defs
+import Mathlib.Analysis.Calculus.Deriv.Slope
 import Mathlib.Analysis.Complex.Trigonometric
 import Mathlib.Analysis.Complex.CauchyIntegral
+import Mathlib.Analysis.Polynomial.Basic
 import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
-import Mathlib.Analysis.Calculus.Deriv.Slope
 
-open Complex Topology MeasureTheory Filter
+open Complex Topology MeasureTheory Filter Polynomial
+
+section RectIntegral
+
+variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+
+noncomputable def rectIntegral (f : ℂ → E) (z w : ℂ) : E :=
+  (((∫ (x : ℝ) in z.re..w.re, f (↑x + ↑z.im * I)) -
+     ∫ (x : ℝ) in z.re..w.re, f (↑x + ↑w.im * I)) +
+     I • ∫ (y : ℝ) in z.im..w.im, f (↑w.re + ↑y * I)) -
+     I • ∫ (y : ℝ) in z.im..w.im, f (↑z.re + ↑y * I)
+
+lemma rectIntegral_add {z w : ℂ} {f1 f2 : ℂ → E}
+    (h1B : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑z.im * I)) volume z.re w.re)
+    (h2B : IntervalIntegrable (fun x : ℝ ↦ f2 (↑x + ↑z.im * I)) volume z.re w.re)
+    (h1T : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑w.im * I)) volume z.re w.re)
+    (h2T : IntervalIntegrable (fun x : ℝ ↦ f2 (↑x + ↑w.im * I)) volume z.re w.re)
+    (h1R : IntervalIntegrable (fun y : ℝ ↦ f1 (↑w.re + ↑y * I)) volume z.im w.im)
+    (h2R : IntervalIntegrable (fun y : ℝ ↦ f2 (↑w.re + ↑y * I)) volume z.im w.im)
+    (h1L : IntervalIntegrable (fun y : ℝ ↦ f1 (↑z.re + ↑y * I)) volume z.im w.im)
+    (h2L : IntervalIntegrable (fun y : ℝ ↦ f2 (↑z.re + ↑y * I)) volume z.im w.im) :
+    rectIntegral (fun z ↦ f1 z + f2 z) z w = rectIntegral f1 z w + rectIntegral f2 z w := by
+  unfold rectIntegral
+  rw [intervalIntegral.integral_add h1B h2B, intervalIntegral.integral_add h1T h2T,
+    intervalIntegral.integral_add h1R h2R, intervalIntegral.integral_add h1L h2L]
+  simp only [smul_add]
+  abel
+
+lemma rectIntegral_const_smul {z w : ℂ} (f1 : ℂ → E) (c : ℂ) :
+    rectIntegral (fun z ↦ c • f1 z) z w = c • rectIntegral f1 z w := by
+  unfold rectIntegral
+  simp only [intervalIntegral.integral_smul]
+  simp only [smul_sub, smul_add, ← smul_assoc, smul_comm c I]
+
+lemma rectIntegral_congr_cofinite {f1 f2 : ℂ → E} {z w : ℂ}
+    (h : f1 =ᶠ[.cofinite] f2) :
+    rectIntegral f1 z w = rectIntegral f2 z w := by
+  unfold rectIntegral
+  congrm ?_ - ?_ + I • ?_ - I • ?_
+    <;> apply intervalIntegral.integral_congr_ae
+  all_goals
+    suffices ∀ᵐ (x : ℝ), _ = _ from this.mono (fun _ h _ => h)
+    apply Filter.EventuallyEq.filter_mono (l := .cofinite) _ <|
+      Filter.le_cofinite_iff_eventually_ne.mpr MeasureTheory.volume.ae_ne
+    apply h.comap _ |>.filter_mono _
+    rw [Function.Injective.comap_cofinite_eq]
+    simp [Function.Injective]
+
+end RectIntegral
+
+lemma rectIntegral_const_mul {z w : ℂ} (f1 : ℂ → ℂ) (c : ℂ) :
+    rectIntegral (fun z ↦ c * f1 z) z w = c * rectIntegral f1 z w :=
+  rectIntegral_const_smul f1 c
 
 noncomputable def g (z : ℂ) : ℂ := exp (I * z) / (z + I)
 
@@ -22,12 +75,6 @@ lemma re_f_eq_cos (x : ℝ) : (f (x : ℂ)).re = Real.cos x / (x^2 + 1) := by
   rw_mod_cast [div_ofReal_re, ← exp_ofReal_mul_I_re]
   ring_nf
 
-noncomputable def rectIntegral (f : ℂ → ℂ) (z w : ℂ) : ℂ :=
-  (((∫ (x : ℝ) in z.re..w.re, f (↑x + ↑z.im * I)) -
-     ∫ (x : ℝ) in z.re..w.re, f (↑x + ↑w.im * I)) +
-     I • ∫ (y : ℝ) in z.im..w.im, f (↑w.re + ↑y * I)) -
-     I • ∫ (y : ℝ) in z.im..w.im, f (↑z.re + ↑y * I)
-
 noncomputable def zR (R : ℝ) : ℂ := -R
 
 noncomputable def wR (R : ℝ) : ℂ := R + R * I
@@ -39,8 +86,7 @@ lemma h_eq_dslope (z : ℂ) : h z = dslope g I z := by
   unfold h f dslope slope
   split_ifs with hz
   · rw [hz, Function.update_self]
-  · rw [Function.update_of_ne hz]
-    rw [vsub_eq_sub, smul_eq_mul]
+  · rw [Function.update_of_ne hz, vsub_eq_sub, smul_eq_mul]
     ring
 
 lemma g_diff_at {z : ℂ} (hz : z + I ≠ 0) : DifferentiableAt ℂ g z := by
@@ -180,7 +226,8 @@ lemma int_bottom (R : ℝ) :
     (∫ x in -R..R, 1 / ((x : ℂ) - I)) = Complex.log (R - I) - Complex.log (-R - I) := by
   have h := int_horizontal (a := -R) (b := R) (w := I) (by
     intro x _
-    rw [mem_slitPlane_iff]; right
+    rw [mem_slitPlane_iff]
+    right
     simp
   )
   rw [← ofReal_neg]
@@ -191,7 +238,8 @@ lemma int_top (R : ℝ) (hR : 1 < R) :
     Complex.log (R + R * I - I) - Complex.log (-R + R * I - I) := by
   have h := int_horizontal (a := -R) (b := R) (w := (-R * I + I)) (by
     intro x _
-    rw [mem_slitPlane_iff]; right
+    rw [mem_slitPlane_iff]
+    right
     simp
     linarith
   )
@@ -207,7 +255,8 @@ lemma int_right (R : ℝ) (hR : 1 < R) :
     Complex.log (R + R * I - I) - Complex.log (R - I) := by
   have h := int_vertical_no_branch_cut (a := 0) (b := R) (w := -(R : ℂ) + I) (by
     intro y _
-    rw [mem_slitPlane_iff]; left
+    rw [mem_slitPlane_iff]
+    left
     have hre : ((y : ℂ) * I - (-(R : ℂ) + I)).re > 0 := by
       simp only [sub_re, mul_re, ofReal_re, I_re, mul_zero, ofReal_im, I_im, mul_one, sub_self,
         add_re, neg_re, add_zero, sub_neg_eq_add, zero_add, gt_iff_lt]
@@ -225,7 +274,8 @@ lemma int_left (R : ℝ) (hR : 1 < R) :
       Complex.log (R - R * I + I) - Complex.log (R + I) := by
   have h := int_vertical_branch_cut (a := 0) (b := R) (w := (R : ℂ) + I) (by
     intro y _
-    rw [mem_slitPlane_iff]; left
+    rw [mem_slitPlane_iff]
+    left
     have hre : (-((y : ℂ) * I - ((R : ℂ) + I))).re > 0 := by
       simp only [neg_sub, sub_re, add_re, ofReal_re, I_re, add_zero, mul_re, mul_zero, ofReal_im,
         I_im, mul_one, sub_self, sub_zero, gt_iff_lt]
@@ -235,16 +285,14 @@ lemma int_left (R : ℝ) (hR : 1 < R) :
   have h_align : ∀ y : ℂ, y * I - ((R : ℂ) + I) = -(R : ℂ) + y * I - I := fun y ↦ by ring
   simp only [h_align] at h
   have h_zero : ((0 : ℝ) : ℂ) * I = 0 := by simp
-  rw [h_zero, add_zero] at h
   have h_inner1 : -(-(R : ℂ) + R * I - I) = R - R * I + I := by ring
   have h_inner2 : -(-(R : ℂ) - I) = R + I := by ring
-  rw [h_inner1, h_inner2] at h
+  rw [h_zero, add_zero, h_inner1, h_inner2] at h
   exact h
 
 lemma log_sub_log_neg_eq_pi_I_of_im_pos {z : ℂ} (hz : 0 < z.im) :
     Complex.log z - Complex.log (-z) = ↑Real.pi * I := by
-  rw [log, log]
-  rw [norm_neg]
+  rw [log, log, norm_neg]
   simp only [add_sub_add_left_eq_sub]
   rw [← sub_mul]
   congr 1
@@ -262,11 +310,9 @@ lemma log_identity (R : ℝ) (hR : 1 < R) :
       (Complex.log (R - R * I + I) - Complex.log (R + I)) =
     (Complex.log (-R + R * I - I) - Complex.log (R - R * I + I)) +
     (Complex.log (R + I) - Complex.log (-R - I)) := by ring
-  rw [h_cancel]
   have h_Z : -R + R * I - I = -(R - R * I + I) := by ring
-  rw [h_Z]
   have h_W : -R - I = -(R + I) := by ring
-  rw [h_W]
+  rw [h_cancel, h_Z, h_W]
   have h_log_Z : Complex.log (-(R - R * I + I)) - Complex.log (R - R * I + I) = I * ↑Real.pi := by
     have h_double_neg : Complex.log (R - R * I + I) = Complex.log (- -(R - R * I + I)) := by
       rw [neg_neg]
@@ -297,33 +343,8 @@ lemma integral_inv_sub_I (R : ℝ) (hR : 1 < R) :
   have h_left_I : I * ∫ (y : ℝ) in 0..R, 1 / (-↑R + ↑y * I - I) =
     ∫ (y : ℝ) in 0..R, I * (1 / (-↑R + ↑y * I - I)) :=
     (intervalIntegral.integral_const_mul I _).symm
-  rw [h_right_I, h_left_I]
-  rw [int_bottom R, int_top R hR, int_right R hR, int_left R hR]
+  rw [h_right_I, h_left_I, int_bottom R, int_top R hR, int_right R hR, int_left R hR]
   exact log_identity R hR
-
-lemma rectIntegral_add {z w : ℂ} {f1 f2 : ℂ → ℂ}
-    (h1B : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑z.im * I)) volume z.re w.re)
-    (h2B : IntervalIntegrable (fun x : ℝ ↦ f2 (↑x + ↑z.im * I)) volume z.re w.re)
-    (h1T : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑w.im * I)) volume z.re w.re)
-    (h2T : IntervalIntegrable (fun x : ℝ ↦ f2 (↑x + ↑w.im * I)) volume z.re w.re)
-    (h1R : IntervalIntegrable (fun y : ℝ ↦ f1 (↑w.re + ↑y * I)) volume z.im w.im)
-    (h2R : IntervalIntegrable (fun y : ℝ ↦ f2 (↑w.re + ↑y * I)) volume z.im w.im)
-    (h1L : IntervalIntegrable (fun y : ℝ ↦ f1 (↑z.re + ↑y * I)) volume z.im w.im)
-    (h2L : IntervalIntegrable (fun y : ℝ ↦ f2 (↑z.re + ↑y * I)) volume z.im w.im) :
-    rectIntegral (fun z ↦ f1 z + f2 z) z w = rectIntegral f1 z w + rectIntegral f2 z w := by
-  unfold rectIntegral
-  rw [intervalIntegral.integral_add h1B h2B]
-  rw [intervalIntegral.integral_add h1T h2T]
-  rw [intervalIntegral.integral_add h1R h2R]
-  rw [intervalIntegral.integral_add h1L h2L]
-  simp only [smul_eq_mul]
-  ring
-
-lemma rectIntegral_const_mul {z w : ℂ} (f1 : ℂ → ℂ) (c : ℂ) :
-    rectIntegral (fun z ↦ c * f1 z) z w = c * rectIntegral f1 z w := by
-  unfold rectIntegral
-  simp only [intervalIntegral.integral_const_mul, smul_eq_mul]
-  ring
 
 local macro "no_poles_in_domain" : tactic => `(tactic|
 · intro var _ contra
@@ -353,28 +374,14 @@ lemma contour_integral_f (R : ℝ) (hR : 1 < R) :
       fun_prop (disch := no_poles_in_domain)
   have h_f1_eq_h : rectIntegral (fun z ↦ f z - g I * (1 / (z - I))) (zR R) (wR R) =
       rectIntegral h (zR R) (wR R) := by
-    unfold rectIntegral zR wR
-    refine congr_arg₂ Sub.sub (congr_arg₂ Add.add (congr_arg₂ Sub.sub ?_ ?_) ?_) ?_
-    all_goals
-      try apply congr_arg (HSMul.hSMul I)
-      apply intervalIntegral.integral_congr
-      intro x _
-      unfold h
-      dsimp only
-      split_ifs with contra
-      · have him := congrArg Complex.im contra
-        have hre := congrArg Complex.re contra
-        simp only [neg_im, ofReal_im, add_im, im_ofReal_mul, I_im, zero_add, neg_zero, add_re,
-          mul_re, I_re, mul_zero, mul_one, sub_self, add_zero, neg_re, ofReal_re, ofReal_neg,
-          neg_eq_zero] at him hre
-        linarith
-      · ring
+    apply rectIntegral_congr_cofinite
+    filter_upwards [show {I}ᶜ ∈ Filter.cofinite by simp] with z hz
+    unfold h
+    split_ifs with h_eq
+    · exact False.elim (hz h_eq)
+    · ring
   rw [h_f1_eq_h] at h_add
-  rw [h_add]
-  rw [integral_h_eq_zero R hR]
-  rw [rectIntegral_const_mul]
-  rw [integral_inv_sub_I R hR]
-  rw [g_I]
+  rw [h_add, integral_h_eq_zero R hR, rectIntegral_const_mul, integral_inv_sub_I R hR, g_I]
   have h_pi : (Real.exp (-1) / (2 * I)) * (2 * ↑Real.pi * I) = ↑Real.pi / Real.exp 1 := by
     rw [Real.exp_neg]
     push_cast
@@ -410,46 +417,34 @@ lemma norm_f_le {z : ℂ} {R : ℝ} (hR : 1 < R) (hz_im : 0 ≤ z.im) (hz_norm :
   have H2 : 0 < ‖z^2 + 1‖ := by nlinarith
   calc ‖Complex.exp (I * z)‖ / ‖z^2 + 1‖ ≤ 1 / (R^2 - 1) := by gcongr
 
-lemma isO_R_div_R_sq_sub_one :
-    (fun R : ℝ ↦ R / (R^2 - 1)) =O[atTop] (fun R : ℝ ↦ R⁻¹) := by
-  apply Asymptotics.IsBigO.of_bound 2
-  filter_upwards [eventually_ge_atTop 2] with R hR
-  have h1 : 0 < R := by linarith
-  have h2 : 0 < R^2 - 1 := by nlinarith
-  rw [Real.norm_of_nonneg (by positivity), Real.norm_of_nonneg (by positivity)]
-  have : R / (R^2 - 1) ≤ 2 * R⁻¹ := by
-    rw [← div_eq_mul_inv, div_le_div_iff₀ h2 h1]
+lemma tendsto_R_div_R_sq_sub_one_zero : Tendsto (fun R : ℝ ↦ R / (R^2 - 1)) atTop (𝓝 0) := by
+  rw [← Asymptotics.isLittleO_iff_tendsto']
+  · convert_to (X : ℝ[X]).eval =o[atTop] (X^2 - 1 : ℝ[X]).eval
+    · ext; simp
+    · ext; simp
+    apply Polynomial.isLittleO_atTop_of_degree_lt
+    convert_to (1 : WithBot ℕ) < 2 <;> (try compute_degree) <;> (norm_num; try decide)
+  · filter_upwards [eventually_gt_atTop 1] with R hR h_zero
     nlinarith
-  exact this
 
 lemma tendsto_integral_of_bound_isO
     (a b : ℝ → ℝ) (f : ℝ → ℝ → ℂ) (c : ℝ)
     (h_bound : ∀ᶠ R in atTop, ∀ t ∈ Set.uIoc (a R) (b R), ‖f R t‖ ≤ 1 / (R ^ 2 - 1))
     (h_len : ∀ᶠ R in atTop, |b R - a R| ≤ c * R) :
     Tendsto (fun R ↦ ∫ y in a R..b R, f R y) atTop (𝓝 0) := by
-  have h_int_bound : (fun R ↦ ∫ y in a R..b R, f R y) =O[atTop] (fun R ↦ R / (R^2 - 1)) := by
-    apply Asymptotics.IsBigO.of_bound c
-    filter_upwards [h_bound, h_len, eventually_gt_atTop 1] with R hB hL hR1
-    have h_norm_le := intervalIntegral.norm_integral_le_of_norm_le_const hB
-    have h2 : 0 < R^2 - 1 := by nlinarith
-    calc ‖∫ (y : ℝ) in a R..b R, f R y‖ ≤ 1 / (R^2 - 1) * |b R - a R| := h_norm_le
-      _ ≤ 1 / (R^2 - 1) * (c * R) := by gcongr
-      _ = c * ‖R / (R^2 - 1)‖ := by
-        rw [Real.norm_of_nonneg (by positivity)]
-        ring
-  have h_isO : (fun R ↦ ∫ y in a R..b R, f R y) =O[atTop] (fun R : ℝ ↦ R⁻¹) :=
-    h_int_bound.trans isO_R_div_R_sq_sub_one
   apply tendsto_zero_iff_norm_tendsto_zero.mpr
-  rcases h_isO.isBigOWith with ⟨k, hk⟩
   apply squeeze_zero'
   · filter_upwards with R using norm_nonneg _
-  · exact Asymptotics.isBigOWith_iff.mp hk
-  · have h_inv : Tendsto (fun R : ℝ ↦ R⁻¹) atTop (𝓝 0) := tendsto_inv_atTop_zero
-    have h_inv_norm : Tendsto (fun R : ℝ ↦ ‖R⁻¹‖) atTop (𝓝 0) := by
-      simpa using h_inv.norm
-    have : 𝓝 (0 : ℝ) = 𝓝 (k * 0) := by rw [mul_zero]
+  · filter_upwards [h_bound, h_len, eventually_gt_atTop 1] with R hB hL hR1
+    have h_norm_le := intervalIntegral.norm_integral_le_of_norm_le_const hB
+    have h_denom_pos : 0 < R^2 - 1 := by nlinarith
+    calc ‖∫ (y : ℝ) in a R..b R, f R y‖
+      _ ≤ 1 / (R^2 - 1) * |b R - a R| := h_norm_le
+      _ ≤ 1 / (R^2 - 1) * (c * R) := by gcongr
+      _ = c * (R / (R^2 - 1)) := by ring
+  · have : 𝓝 (0 : ℝ) = 𝓝 (c * 0) := by rw [mul_zero]
     rw [this]
-    exact h_inv_norm.const_mul k
+    exact tendsto_R_div_R_sq_sub_one_zero.const_mul c
 
 lemma limit_right_edge :
     Tendsto (fun R : ℝ ↦ ∫ (y : ℝ) in 0..R, f (↑R + ↑y * I)) atTop (𝓝 0) := by
