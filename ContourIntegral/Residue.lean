@@ -2,6 +2,7 @@ import Mathlib.MeasureTheory.Integral.IntervalIntegral.Basic
 import Mathlib.Analysis.Complex.Trigonometric
 import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.Analysis.Calculus.Deriv.Slope
 
 open Complex Topology Function MeasureTheory Filter
@@ -407,21 +408,13 @@ lemma norm_f_le {z : ℂ} {R : ℝ} (hR : 1 < R) (hz_im : 0 ≤ z.im) (hz_norm :
     rw [h_z2] at ht
     simp only [norm_neg, norm_one] at ht
     linarith
-  have h_R_pos : 0 < R := by linarith
+  have h_R_pos : 0 < R := by positivity
   have h_R_sq : R^2 ≤ ‖z‖^2 := by nlinarith [hz_norm, h_R_pos]
   have h_norm_sq : ‖z^2‖ = ‖z‖^2 := norm_pow z 2
   have h_den : R^2 - 1 ≤ ‖z^2 + 1‖ := by linarith [h_tri, h_R_sq, h_norm_sq]
   have H1 : 0 < R^2 - 1 := by nlinarith
-  have H2 : 0 < ‖z^2 + 1‖ := by linarith
-  calc ‖Complex.exp (I * z)‖ / ‖z^2 + 1‖
-    _ = ‖Complex.exp (I * z)‖ * (‖z^2 + 1‖)⁻¹ := by rw [div_eq_mul_inv]
-    _ ≤ 1 * (‖z^2 + 1‖)⁻¹ := by
-      apply mul_le_mul_of_nonneg_right h_num
-      exact inv_nonneg.mpr (norm_nonneg _)
-    _ = 1 / ‖z^2 + 1‖ := by rw [one_mul, inv_eq_one_div]
-    _ ≤ 1 / (R^2 - 1) := by
-      rw [one_div_le_one_div H2 H1]
-      exact h_den
+  have H2 : 0 < ‖z^2 + 1‖ := by nlinarith
+  calc ‖Complex.exp (I * z)‖ / ‖z^2 + 1‖ ≤ 1 / (R^2 - 1) := by gcongr
 
 lemma limit_right_edge :
     Tendsto (fun R : ℝ ↦ ∫ (y : ℝ) in 0..R, f (↑R + ↑y * I)) atTop (𝓝 0) := by
@@ -581,7 +574,7 @@ lemma limit_real_line :
   simp only [mul_zero, add_zero, sub_zero] at h_lim
   exact Filter.Tendsto.congr' h_eq_symm h_lim
 
-theorem integral_cos_div_sq_add_one :
+theorem integral_cpv_cos_div_sq_add_one :
     Tendsto (fun R : ℝ ↦ ∫ (x : ℝ) in -R..R, Real.cos x / (x^2 + 1))
     atTop (𝓝 (Real.pi / Real.exp 1)) := by
   have h_re := (Complex.continuous_re.tendsto (↑Real.pi / Real.exp 1 : ℂ)).comp limit_real_line
@@ -604,3 +597,32 @@ theorem integral_cos_div_sq_add_one :
     atTop (𝓝 (Real.pi / Real.exp 1)) at h_re
   rw [h_LHS] at h_re
   exact h_re
+
+lemma integrable_cos_div : Integrable (fun x : ℝ ↦ Real.cos x / (x^2 + 1)) := by
+  have h_bound_integrable : Integrable (fun x : ℝ ↦ 1 / (x^2 + 1)) := by
+    have h_eq : (fun x : ℝ ↦ 1 / (x^2 + 1)) = fun x ↦ (1 + x^2)⁻¹ := by ring_nf
+    rw [h_eq]
+    exact integrable_inv_one_add_sq
+  apply h_bound_integrable.mono
+  · apply Continuous.aestronglyMeasurable
+    refine Continuous.div (by fun_prop) (by fun_prop) ?_
+    intro x
+    positivity
+  · filter_upwards with x
+    have h1 : 0 < x^2 + 1 := by positivity
+    have h2 : ‖Real.cos x‖ ≤ 1 := Real.abs_cos_le_one x
+    rw [norm_div, Real.norm_eq_abs (1 / (x^2 + 1)), Real.norm_eq_abs (x^2 + 1), abs_one_div,
+      abs_of_pos h1]
+    gcongr
+
+theorem lebesgue_integral_cos_div_sq_add_one :
+    ∫ x : ℝ, Real.cos x / (x^2 + 1) = Real.pi / Real.exp 1 := by
+  have h_CPV := integral_cpv_cos_div_sq_add_one
+
+  have h_Lebesgue : Tendsto (fun R : ℝ ↦ ∫ x in -R..R, Real.cos x / (x^2 + 1))
+      atTop (𝓝 (∫ x : ℝ, Real.cos x / (x^2 + 1))) := by
+    apply intervalIntegral_tendsto_integral
+    · exact integrable_cos_div
+    · exact tendsto_neg_atTop_atBot
+    · exact?
+  exact tendsto_nhds_unique h_Lebesgue h_CPV
