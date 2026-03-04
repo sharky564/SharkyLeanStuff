@@ -14,7 +14,9 @@ open Complex Topology MeasureTheory Filter Polynomial Set
 
 section RectIntegral
 
-variable {E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+variable
+  {𝕜 E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
+  [NormedDivisionRing 𝕜] [Module 𝕜 E] [NormSMulClass 𝕜 E] [SMulCommClass ℂ 𝕜 E]
 
 noncomputable def rectIntegral (f : ℂ → E) (z w : ℂ) : E :=
   (((∫ (x : ℝ) in z.re..w.re, f (↑x + ↑z.im * I)) -
@@ -38,11 +40,10 @@ lemma rectIntegral_add {z w : ℂ} {f1 f2 : ℂ → E}
   simp only [smul_add]
   abel
 
-lemma rectIntegral_const_smul {z w : ℂ} (f1 : ℂ → E) (c : ℂ) :
+lemma rectIntegral_const_smul {z w : ℂ} (f1 : ℂ → E) (c : 𝕜) :
     rectIntegral (fun z ↦ c • f1 z) z w = c • rectIntegral f1 z w := by
   unfold rectIntegral
-  simp only [intervalIntegral.integral_smul]
-  simp only [smul_sub, smul_add, ← smul_assoc, smul_comm c I]
+  simp only [intervalIntegral.integral_smul, smul_comm, smul_sub, smul_add]
 
 lemma rectIntegral_finset_sum {ι : Type*} (s : Finset ι) (F : ι → ℂ → E) (z w : ℂ)
     (hB : ∀ i ∈ s, IntervalIntegrable (fun x : ℝ ↦ F i (↑x + ↑z.im * I)) volume z.re w.re)
@@ -144,27 +145,19 @@ lemma g_div_pow_eq (g : ℂ → ℂ) (c : ℂ) (n : ℕ) (z : ℂ) (hz : z ≠ c
 
 lemma hasDerivAt_F_pow (m : ℕ) (c x : ℂ) (hx : x ≠ c) :
     HasDerivAt (F_pow m c) (1 / (x - c)^(m + 2)) x := by
-  have hd1 : HasDerivAt (fun s ↦ s - c) 1 x := (hasDerivAt_id x).sub_const c
-  have hd2 : HasDerivAt (fun s ↦ (s - c)^(m + 1)) (↑(m + 1) * (x - c)^m * 1) x := hd1.pow (m + 1)
   have hx_sub : x - c ≠ 0 := sub_ne_zero.mpr hx
   have h_pow_ne : (x - c) ^ (m + 1) ≠ 0 := pow_ne_zero _ hx_sub
   have h_m_ne : (m + 1 : ℂ) ≠ 0 := Nat.cast_add_one_ne_zero m
-  have hd3 : HasDerivAt (fun s ↦ (m + 1 : ℂ) * (s - c)^(m + 1))
-    ((m + 1 : ℂ) * (↑(m + 1) * (x - c)^m * 1)) x := hd2.const_mul (m + 1 : ℂ)
-  have hd4 := (hasDerivAt_const x (-1 : ℂ)).div hd3 (mul_ne_zero h_m_ne h_pow_ne)
-  apply hd4.congr_deriv
+  have hd1 : HasDerivAt (fun s ↦ (m + 1 : ℂ) * (s - c)^(m + 1)) ((m + 1 : ℂ) * (↑(m + 1) *
+    (x - c)^m * 1)) x := (((hasDerivAt_id x).sub_const c).pow (m + 1)).const_mul (m + 1 : ℂ)
+  have hd2 := (hasDerivAt_const x (-1 : ℂ)).div hd1 (mul_ne_zero h_m_ne h_pow_ne)
+  apply hd2.congr_deriv
   simp only [zero_mul, Nat.cast_add, Nat.cast_one, mul_one, neg_mul, one_mul, sub_neg_eq_add,
     zero_add]
   have hA_ne : (m + 1 : ℂ) ^ 2 * (x - c) ^ m ≠ 0 :=
     mul_ne_zero (pow_ne_zero 2 h_m_ne) (pow_ne_zero m hx_sub)
   have h_den : ((m + 1 : ℂ) * (x - c) ^ (m + 1)) ^ 2 =
-      ((m + 1 : ℂ) ^ 2 * (x - c) ^ m) * (x - c) ^ (m + 2) := by
-    calc ((m + 1 : ℂ) * (x - c) ^ (m + 1)) ^ 2
-      _ = (m + 1 : ℂ) ^ 2 * ((x - c) ^ (m + 1)) ^ 2 := by rw [mul_pow]
-      _ = (m + 1 : ℂ) ^ 2 * (x - c) ^ ((m + 1) * 2) := by rw [← pow_mul]
-      _ = (m + 1 : ℂ) ^ 2 * (x - c) ^ (m + (m + 2)) := by congr 2; omega
-      _ = (m + 1 : ℂ) ^ 2 * ((x - c) ^ m * (x - c) ^ (m + 2)) := by rw [pow_add]
-      _ = ((m + 1 : ℂ) ^ 2 * (x - c) ^ m) * (x - c) ^ (m + 2) := by ring
+      ((m + 1) ^ 2 * (x - c) ^ m) * (x - c) ^ (m + 2) := by field_simp; ring
   rw [h_den]
   refine Eq.trans ?_ (mul_div_mul_left 1 ((x - c) ^ (m + 2)) hA_ne)
   congr 1
@@ -284,10 +277,7 @@ lemma int_vertical_branch_cut {a b : ℝ} {w : ℂ}
     have h_outer : HasDerivAt Complex.log (1 / (-((y : ℂ) * I - w))) (-((y : ℂ) * I - w)) := by
       simp only [one_div]
       exact Complex.hasDerivAt_log (h_slit y hy)
-    have h_alg : (1 / -((y : ℂ) * I - w)) * -I = I * (1 / ((y : ℂ) * I - w)) := by
-      calc (1 / -((y : ℂ) * I - w)) * -I
-        _ = -(1 / ((y : ℂ) * I - w)) * -I := by rw [div_neg]
-        _ = I * (1 / ((y : ℂ) * I - w)) := by ring
+    have h_alg : (1 / -((y : ℂ) * I - w)) * -I = I * (1 / (y * I - w)) := by field_simp
     exact (HasDerivAt.comp y h_outer h_inner).congr_deriv h_alg
   · apply ContinuousOn.intervalIntegrable
     refine ContinuousOn.mul continuousOn_const (ContinuousOn.div continuousOn_const ?_ ?_)
@@ -533,7 +523,7 @@ theorem residue_theorem_rect_pole (g : ℂ → ℂ) (n : ℕ) (c z w : ℂ)
           dslope_iter g c i c * rectIntegral (fun x ↦ 1 / (x - c) ^ (m + 1 - i)) z w := by
         apply Finset.sum_congr rfl
         intro k _
-        exact rectIntegral_const_smul _ _
+        exact rectIntegral_const_smul _ (dslope_iter g c k c)
       rw [h_extract_const]
       rw [Finset.sum_range_succ]
       have h_higher_orders_zero : ∑ k ∈ Finset.range m,
@@ -648,23 +638,15 @@ lemma contour_integral_f (t : ℝ) (R : ℝ) (hR : 1 < R) :
     apply DifferentiableAt.differentiableWithinAt
     apply DifferentiableAt.div (by fun_prop) (by fun_prop)
     intro contra
-    have : z = -I := by
-      calc z
-        _ = (z + I) - I := by ring
-        _ = 0 - I := by rw [contra]
-        _ = -I := by ring
+    have : z = -I := by linear_combination contra
     exact hz this
   have h_thm := residue_theorem_rect_pole g 1 I (zR R) (wR R)
     hz_re hw_re hz_im hw_im U hU_open h_filled h_holo
   have h_f_eq : (fun x ↦ g x / (x - I) ^ 1) = f t := by
     ext x
     simp only [pow_one, f]
-    have h_denom : (x + I) * (x - I) = x^2 + 1 := by
-      calc (x + I) * (x - I)
-        _ = x^2 - I^2 := by ring
-        _ = x^2 + 1 := by simp [I_sq]
     change Complex.exp (I * t * x) / (x + I) / (x - I) = Complex.exp (I * t * x) / (x^2 + 1)
-    rw [div_div, h_denom]
+    rw [div_div, ← sq_sub_sq, Complex.I_sq, sub_neg_eq_add]
   rw [h_f_eq] at h_thm
   have h_res : residue_pole g I 1 = g I := rfl
   have h_g_I : g I = Real.exp (-t) / (2 * I) := by
@@ -686,16 +668,9 @@ lemma norm_f_le {t : ℝ} (ht : 0 ≤ t) {z : ℂ} {R : ℝ} (hR : 1 < R) (hz_im
   rw [norm_div]
   have h_num : ‖Complex.exp (I * t * z)‖ ≤ 1 := by
     rw [norm_exp]
-    have h2 : (I * (t : ℂ) * z).re = -t * z.im := by
-      calc (I * (t : ℂ) * z).re
-        _ = (t * z * I).re := by congr 1; ring
-        _ = -(t * z).im := by rw [mul_I_re]
-        _ = -(t * z.im) := by rw [im_ofReal_mul]
-        _ = -t * z.im := by ring
-    rw [h2]
-    apply Real.exp_le_one_iff.mpr
-    have : 0 ≤ t * z.im := mul_nonneg ht hz_im
-    linarith
+    simp only [mul_re, I_re, ofReal_re, zero_mul, I_im, ofReal_im, mul_zero, sub_self, mul_im,
+      one_mul, zero_add, zero_sub, Real.exp_le_one_iff, Left.neg_nonpos_iff]
+    exact mul_nonneg ht hz_im
   have h_tri : ‖z^2‖ - 1 ≤ ‖z^2 + 1‖ := by
     simpa [← norm_pow] using norm_sub_norm_le (z^2) (-1)
   have h_R_pos : 0 < R := by positivity
