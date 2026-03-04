@@ -10,11 +10,38 @@ variable
   {𝕜 E : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
   [NormedDivisionRing 𝕜] [Module 𝕜 E] [NormSMulClass 𝕜 E] [SMulCommClass ℂ 𝕜 E]
 
+/--
+Computes the contour integral of a function `f` along the boundary of an axis-aligned
+rectangle with opposite corners `z` and `w`. The integration is performed
+counterclockwise by explicitly parameterizing the bottom, top, right, and left edges.
+-/
 noncomputable def rectIntegral (f : ℂ → E) (z w : ℂ) : E :=
   (((∫ (x : ℝ) in z.re..w.re, f (↑x + ↑z.im * I)) -
      ∫ (x : ℝ) in z.re..w.re, f (↑x + ↑w.im * I)) +
      I • ∫ (y : ℝ) in z.im..w.im, f (↑w.re + ↑y * I)) -
      I • ∫ (y : ℝ) in z.im..w.im, f (↑z.re + ↑y * I)
+
+/--
+The topological boundary of the axis-aligned rectangle with opposite corners `z` and `w`.
+It consists of the union of the two vertical edges and the two horizontal edges.
+-/
+def boundaryRect (z w : ℂ) : Set ℂ :=
+  {p : ℂ | (p.re = z.re ∨ p.re = w.re) ∧ p.im ∈ uIcc z.im w.im} ∪
+  {p : ℂ | (p.im = z.im ∨ p.im = w.im) ∧ p.re ∈ uIcc z.re w.re}
+
+/--
+The open interior of the axis-aligned rectangle with opposite corners `z` and `w`.
+-/
+def interiorRect (z w : ℂ) : Set ℂ :=
+  {p : ℂ | p.re ∈ Ioo (min z.re w.re) (max z.re w.re) ∧
+           p.im ∈ Ioo (min z.im w.im) (max z.im w.im)}
+
+/--
+The closed axis-aligned rectangle with opposite corners `z` and `w`,
+including both its interior and its boundary.
+-/
+def filledRect (z w : ℂ) : Set ℂ :=
+  {p : ℂ | p.re ∈ uIcc z.re w.re ∧ p.im ∈ uIcc z.im w.im}
 
 lemma rectIntegral_add {z w : ℂ} {f1 f2 : ℂ → E}
     (h1B : IntervalIntegrable (fun x : ℝ ↦ f1 (↑x + ↑z.im * I)) volume z.re w.re)
@@ -47,17 +74,6 @@ lemma rectIntegral_finset_sum {ι : Type*} (s : Finset ι) (F : ι → ℂ → E
   simp_rw [intervalIntegral.integral_finset_sum hB, intervalIntegral.integral_finset_sum hT,
     intervalIntegral.integral_finset_sum hR, intervalIntegral.integral_finset_sum hL]
   simp only [Finset.smul_sum, ← Finset.sum_sub_distrib, ← Finset.sum_add_distrib]
-
-def boundaryRect (z w : ℂ) : Set ℂ :=
-  {p : ℂ | (p.re = z.re ∨ p.re = w.re) ∧ p.im ∈ uIcc z.im w.im} ∪
-  {p : ℂ | (p.im = z.im ∨ p.im = w.im) ∧ p.re ∈ uIcc z.re w.re}
-
-def interiorRect (z w : ℂ) : Set ℂ :=
-  {p : ℂ | p.re ∈ Ioo (min z.re w.re) (max z.re w.re) ∧
-           p.im ∈ Ioo (min z.im w.im) (max z.im w.im)}
-
-def filledRect (z w : ℂ) : Set ℂ :=
-  {p : ℂ | p.re ∈ uIcc z.re w.re ∧ p.im ∈ uIcc z.im w.im}
 
 lemma mem_boundaryRect_bottom (z w : ℂ) {x : ℝ} (hx : x ∈ uIcc z.re w.re) :
     (x : ℂ) + z.im * I ∈ boundaryRect z w := by

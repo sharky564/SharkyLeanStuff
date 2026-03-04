@@ -7,26 +7,37 @@ open Complex Topology MeasureTheory Filter Set Polynomial
 
 namespace ContourIntegral
 
-noncomputable def f (t : ℝ) (z : ℂ) : ℂ := exp (I * t * z) / (z ^ 2 + 1)
+/--
+The specific complex integrand `e^{itz} / (z^2 + 1)` used to evaluate
+the improper integral `∫ cos(tx) / (x^2 + 1) dx`.
+-/
+noncomputable def integrand (t : ℝ) (z : ℂ) : ℂ := exp (I * t * z) / (z ^ 2 + 1)
 
-noncomputable def zR (R : ℝ) : ℂ := -R
+/--
+The bottom-left corner `-R` of the rectangular contour used to integrate `f`.
+-/
+noncomputable def bottomLeft (R : ℝ) : ℂ := -R
 
-noncomputable def wR (R : ℝ) : ℂ := R + R * I
+/--
+The top-right corner `R + R*I` of the rectangular contour used to integrate `f`.
+The height `R` is chosen so that `e^{itz}` decays sufficiently fast as `R → ∞`.
+-/
+noncomputable def topRight (R : ℝ) : ℂ := R + R * I
 
-lemma contour_integral_f (t : ℝ) (R : ℝ) (hR : 1 < R) :
-    rectIntegral (f t) (zR R) (wR R) = ↑Real.pi * Real.exp (-t) := by
+lemma contour_integral (t : ℝ) (R : ℝ) (hR : 1 < R) :
+    rectIntegral (integrand t) (bottomLeft R) (topRight R) = ↑Real.pi * Real.exp (-t) := by
   let U : Set ℂ := {-I}ᶜ
   have hU_open : IsOpen U := isOpen_compl_singleton
-  have hz_re : (zR R).re < I.re := by simp [zR]; linarith
-  have hz_im : (zR R).im < I.im := by simp [zR]
-  have hw_re : I.re < (wR R).re := by simp [wR]; linarith
-  have hw_im : I.im < (wR R).im := by simp [wR]; linarith
-  have h_filled : filledRect (zR R) (wR R) ⊆ U := by
+  have hz_re : (bottomLeft R).re < I.re := by simp [bottomLeft]; linarith
+  have hz_im : (bottomLeft R).im < I.im := by simp [bottomLeft]
+  have hw_re : I.re < (topRight R).re := by simp [topRight]; linarith
+  have hw_im : I.im < (topRight R).im := by simp [topRight]; linarith
+  have h_filled : filledRect (bottomLeft R) (topRight R) ⊆ U := by
     rintro z hz contra
     have him : z.im = (-I).im := congrArg Complex.im contra
     simp only [neg_im, I_im] at him
     have hz_im_bounds := hz.2
-    unfold zR wR at hz_im_bounds
+    unfold bottomLeft topRight at hz_im_bounds
     simp only [neg_im, ofReal_im, neg_zero, add_im, mul_im, ofReal_re, I_im, mul_one, I_re,
       mul_zero, add_zero, zero_add, mem_uIcc] at hz_im_bounds
     rcases hz_im_bounds with ⟨h1, h2⟩ | ⟨h1, h2⟩ <;> linarith
@@ -38,11 +49,11 @@ lemma contour_integral_f (t : ℝ) (R : ℝ) (hR : 1 < R) :
     intro contra
     have : z = -I := by linear_combination contra
     exact hz this
-  have h_thm := residue_theorem_rect_pole g 1 I (zR R) (wR R)
+  have h_thm := residue_theorem_rect_pole g 1 I (bottomLeft R) (topRight R)
     hz_re hw_re hz_im hw_im U hU_open h_filled h_holo
-  have h_f_eq : (fun x ↦ g x / (x - I) ^ 1) = f t := by
+  have h_f_eq : (fun x ↦ g x / (x - I) ^ 1) = integrand t := by
     ext x
-    simp only [pow_one, f]
+    simp only [pow_one, integrand]
     change Complex.exp (I * t * x) / (x + I) / (x - I) = Complex.exp (I * t * x) / (x^2 + 1)
     rw [div_div, ← sq_sub_sq, Complex.I_sq, sub_neg_eq_add]
   rw [h_f_eq] at h_thm
@@ -61,8 +72,8 @@ lemma contour_integral_f (t : ℝ) (R : ℝ) (hR : 1 < R) :
   exact h_pi
 
 lemma norm_f_le {t : ℝ} (ht : 0 ≤ t) {z : ℂ} {R : ℝ} (hR : 1 < R) (hz_im : 0 ≤ z.im)
-    (hz_norm : R ≤ ‖z‖) : ‖f t z‖ ≤ 1 / (R^2 - 1) := by
-  unfold f
+    (hz_norm : R ≤ ‖z‖) : ‖integrand t z‖ ≤ 1 / (R^2 - 1) := by
+  unfold integrand
   rw [norm_div]
   have h_num : ‖Complex.exp (I * t * z)‖ ≤ 1 := by
     rw [norm_exp]
@@ -111,8 +122,9 @@ lemma tendsto_integral_of_bound_isO
     exact tendsto_R_div_R_sq_sub_one_zero.const_mul c
 
 lemma limit_right_edge {t : ℝ} (ht : 0 ≤ t) :
-    Tendsto (fun R : ℝ ↦ ∫ (y : ℝ) in 0..R, f t (↑R + ↑y * I)) atTop (𝓝 0) := by
-  apply tendsto_integral_of_bound_isO (fun _ ↦ 0) (fun R ↦ R) (fun R y ↦ f t (↑R + ↑y * I)) 1
+    Tendsto (fun R : ℝ ↦ ∫ (y : ℝ) in 0..R, integrand t (↑R + ↑y * I)) atTop (𝓝 0) := by
+  apply tendsto_integral_of_bound_isO (fun _ ↦ 0) (fun R ↦ R)
+    (fun R y ↦ integrand t (↑R + ↑y * I)) 1
   · filter_upwards [eventually_gt_atTop 1] with R hR y hy
     apply norm_f_le ht hR
     · simp only [add_im, ofReal_im, mul_im, ofReal_re, I_im, mul_one, I_re, mul_zero, add_zero,
@@ -127,8 +139,9 @@ lemma limit_right_edge {t : ℝ} (ht : 0 ≤ t) :
     rw [sub_zero, abs_of_pos hR, one_mul]
 
 lemma limit_left_edge {t : ℝ} (ht : 0 ≤ t) :
-    Tendsto (fun R : ℝ ↦ ∫ (y : ℝ) in 0..R, f t (-↑R + ↑y * I)) atTop (𝓝 0) := by
-  apply tendsto_integral_of_bound_isO (fun _ ↦ 0) (fun R ↦ R) (fun R y ↦ f t (-↑R + ↑y * I)) 1
+    Tendsto (fun R : ℝ ↦ ∫ (y : ℝ) in 0..R, integrand t (-↑R + ↑y * I)) atTop (𝓝 0) := by
+  apply tendsto_integral_of_bound_isO (fun _ ↦ 0) (fun R ↦ R)
+    (fun R y ↦ integrand t (-↑R + ↑y * I)) 1
   · filter_upwards [eventually_gt_atTop 1] with R hR y hy
     apply norm_f_le ht hR
     · simp only [add_im, neg_im, ofReal_im, neg_zero, mul_im, ofReal_re, I_im, mul_one, I_re,
@@ -143,8 +156,9 @@ lemma limit_left_edge {t : ℝ} (ht : 0 ≤ t) :
     rw [sub_zero, abs_of_pos hR, one_mul]
 
 lemma limit_top_edge {t : ℝ} (ht : 0 ≤ t) :
-    Tendsto (fun R : ℝ ↦ ∫ (x : ℝ) in -R..R, f t (↑x + ↑R * I)) atTop (𝓝 0) := by
-  apply tendsto_integral_of_bound_isO (fun R ↦ -R) (fun R ↦ R) (fun R x ↦ f t (↑x + ↑R * I)) 2
+    Tendsto (fun R : ℝ ↦ ∫ (x : ℝ) in -R..R, integrand t (↑x + ↑R * I)) atTop (𝓝 0) := by
+  apply tendsto_integral_of_bound_isO (fun R ↦ -R) (fun R ↦ R)
+    (fun R x ↦ integrand t (↑x + ↑R * I)) 2
   · filter_upwards [eventually_gt_atTop 1] with R hR x _
     apply norm_f_le ht hR
     · simp only [add_im, ofReal_im, mul_im, ofReal_re, I_im, mul_one, I_re, mul_zero, add_zero,
@@ -158,22 +172,23 @@ lemma limit_top_edge {t : ℝ} (ht : 0 ≤ t) :
     rw [sub_neg_eq_add, ← two_mul, abs_of_pos (by positivity)]
 
 lemma limit_real_line {t : ℝ} (ht : 0 ≤ t) :
-    Tendsto (fun R : ℝ ↦ ∫ (x : ℝ) in -R..R, f t (x : ℂ)) atTop (𝓝 (↑Real.pi * Real.exp (-t))) := by
-  have h_eq : ∀ᶠ R : ℝ in atTop, ∫ (x : ℝ) in -R..R, f t (x : ℂ) =
+    Tendsto (fun R : ℝ ↦ ∫ (x : ℝ) in -R..R, integrand t (x : ℂ)) atTop
+    (𝓝 (↑Real.pi * Real.exp (-t))) := by
+  have h_eq : ∀ᶠ R : ℝ in atTop, ∫ (x : ℝ) in -R..R, integrand t (x : ℂ) =
       (((↑Real.pi * Real.exp (-t) : ℂ) +
-      ∫ (x : ℝ) in -R..R, f t (↑x + ↑R * I)) -
-      I * ∫ (y : ℝ) in 0..R, f t (↑R + ↑y * I)) +
-      I * ∫ (y : ℝ) in 0..R, f t (-↑R + ↑y * I) := by
+      ∫ (x : ℝ) in -R..R, integrand t (↑x + ↑R * I)) -
+      I * ∫ (y : ℝ) in 0..R, integrand t (↑R + ↑y * I)) +
+      I * ∫ (y : ℝ) in 0..R, integrand t (-↑R + ↑y * I) := by
     filter_upwards [eventually_gt_atTop 1] with R hR
-    have h_cont := contour_integral_f t R hR
-    unfold rectIntegral zR wR at h_cont
+    have h_cont := contour_integral t R hR
+    unfold rectIntegral bottomLeft topRight at h_cont
     simp only [neg_im, ofReal_im, neg_zero, ofReal_zero, zero_mul, add_zero, neg_re, ofReal_re,
       add_re, mul_re, I_re, mul_zero, I_im, mul_one, sub_self, smul_eq_mul, add_im, im_ofReal_mul,
       ofReal_neg, zero_add] at h_cont
-    generalize ∫ (x : ℝ) in -R..R, f t (x : ℂ) = A at h_cont ⊢
-    generalize ∫ (x : ℝ) in -R..R, f t (↑x + ↑R * I) = B at h_cont ⊢
-    generalize I * ∫ (y : ℝ) in 0..R, f t (↑R + ↑y * I) = C at h_cont ⊢
-    generalize I * ∫ (y : ℝ) in 0..R, f t (-↑R + ↑y * I) = D at h_cont ⊢
+    generalize ∫ (x : ℝ) in -R..R, integrand t (x : ℂ) = A at h_cont ⊢
+    generalize ∫ (x : ℝ) in -R..R, integrand t (↑x + ↑R * I) = B at h_cont ⊢
+    generalize I * ∫ (y : ℝ) in 0..R, integrand t (↑R + ↑y * I) = C at h_cont ⊢
+    generalize I * ∫ (y : ℝ) in 0..R, integrand t (-↑R + ↑y * I) = D at h_cont ⊢
     calc A
       _ = (A - B + C - D) + B - C + D := by ring
       _ = (↑Real.pi * Real.exp (-t) : ℂ) + B - C + D := by rw [h_cont]
@@ -182,9 +197,10 @@ lemma limit_real_line {t : ℝ} (ht : 0 ≤ t) :
     ((limit_left_edge ht).const_mul I)
   have h_eq_symm : ∀ᶠ R : ℝ in atTop,
       (((↑Real.pi * Real.exp (-t) : ℂ) +
-      ∫ (x : ℝ) in -R..R, f t (↑x + ↑R * I)) -
-      I * ∫ (y : ℝ) in 0..R, f t (↑R + ↑y * I)) +
-      I * ∫ (y : ℝ) in 0..R, f t (-↑R + ↑y * I) = ∫ (x : ℝ) in -R..R, f t (x : ℂ) := by
+      ∫ (x : ℝ) in -R..R, integrand t (↑x + ↑R * I)) -
+      I * ∫ (y : ℝ) in 0..R, integrand t (↑R + ↑y * I)) +
+      I * ∫ (y : ℝ) in 0..R, integrand t (-↑R + ↑y * I) =
+      ∫ (x : ℝ) in -R..R, integrand t (x : ℂ) := by
     filter_upwards [h_eq] with R hR_eq
     exact hR_eq.symm
   simp only [mul_zero, add_zero, sub_zero] at h_lim
@@ -197,25 +213,26 @@ theorem integral_cpv_cos_div_sq_add_one {t : ℝ} (ht : 0 ≤ t) :
     (limit_real_line ht)
   have h_RHS : (↑Real.pi * (Real.exp (-t) : ℂ)).re = Real.pi * Real.exp (-t) := by norm_cast
   rw [h_RHS] at h_re
-  have h_LHS : (fun R : ℝ ↦ (∫ (x : ℝ) in -R..R, f t (x : ℂ)).re) =
+  have h_LHS : (fun R : ℝ ↦ (∫ (x : ℝ) in -R..R, integrand t (x : ℂ)).re) =
       (fun R : ℝ ↦ ∫ (x : ℝ) in -R..R, Real.cos (t * x) / (x^2 + 1)) := by
     ext R
-    have h_int : IntervalIntegrable (fun x : ℝ ↦ f t (x : ℂ)) volume (-R) R := by
+    have h_int : IntervalIntegrable (fun x : ℝ ↦ integrand t (x : ℂ)) volume (-R) R := by
       apply ContinuousOn.intervalIntegrable
-      unfold f
+      unfold integrand
       fun_prop (disch := intro x _; norm_cast; nlinarith)
-    have h_comm : (∫ (x : ℝ) in -R..R, f t (x : ℂ)).re = ∫ (x : ℝ) in -R..R, (f t (x : ℂ)).re :=
+    have h_comm : (∫ (x : ℝ) in -R..R, integrand t (x : ℂ)).re = ∫ (x : ℝ) in -R..R,
+        (integrand t (x : ℂ)).re :=
       (ContinuousLinearMap.intervalIntegral_comp_comm Complex.reCLM h_int).symm
     rw [h_comm]
     apply intervalIntegral.integral_congr
-    have h_re (x : ℝ) : (f t (x : ℂ)).re = Real.cos (t * x) / (x^2 + 1) := by
-      unfold f
+    have h_re (x : ℝ) : (integrand t (x : ℂ)).re = Real.cos (t * x) / (x^2 + 1) := by
+      unfold integrand
       rw_mod_cast [div_ofReal_re, ← exp_ofReal_mul_I_re]
       have h_exp : I * ↑t * ↑x = ↑(t * x) * I := by push_cast; ring
       rw [h_exp]
     intro x _
     exact h_re x
-  change Tendsto (fun R : ℝ ↦ (∫ (x : ℝ) in -R..R, f t (x : ℂ)).re)
+  change Tendsto (fun R : ℝ ↦ (∫ (x : ℝ) in -R..R, integrand t (x : ℂ)).re)
     atTop (𝓝 (Real.pi * Real.exp (-t))) at h_re
   rw [h_LHS] at h_re
   exact h_re

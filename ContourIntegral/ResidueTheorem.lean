@@ -10,13 +10,27 @@ open Complex Topology MeasureTheory Filter Polynomial Set
 
 namespace ContourIntegral
 
+/--
+Iterates the difference quotient function `dslope` `n` times for a function `g`
+centered at a point `c`. Evaluated at `c`, `dslope_iter g c n c` corresponds to
+the Taylor coefficient `g^{(n)}(c) / n!`.
+-/
 noncomputable def dslope_iter (g : ℂ → ℂ) (c : ℂ) : ℕ → (ℂ → ℂ)
 | 0 => g
 | (n + 1) => dslope (dslope_iter g c n) c
 
+/--
+Computes the residue of a meromorphic function of the form `z ↦ g z / (z - c)^n`
+at the pole `c`. By Cauchy's integral formula, this equals `g^{(n-1)}(c) / (n-1)!`.
+-/
 noncomputable def residue_pole (g : ℂ → ℂ) (c : ℂ) (n : ℕ) : ℂ :=
   if n = 0 then 0 else dslope_iter g c (n - 1) c
 
+/--
+An explicit algebraic primitive (antiderivative) of `s ↦ 1 / (s - c)^{m+2}`.
+Used to prove via the Fundamental Theorem of Calculus that the integral of
+higher-order poles along closed rectangular contours evaluates to zero.
+-/
 noncomputable def F_pow (m : ℕ) (c s : ℂ) : ℂ := -1 / ((m + 1 : ℂ) * (s - c)^(m + 1))
 
 lemma g_div_pow_eq (g : ℂ → ℂ) (c : ℂ) (n : ℕ) (z : ℂ) (hz : z ≠ c) :
