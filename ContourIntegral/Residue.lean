@@ -135,12 +135,8 @@ lemma g_div_pow_eq (g : ℂ → ℂ) (c : ℂ) (n : ℕ) (z : ℂ) (hz : z ≠ c
     have h_sum : (∑ x ∈ Finset.range n, dslope_iter g c x c / (z - c) ^ (n + 1 - x)) =
                  (∑ x ∈ Finset.range n, dslope_iter g c x c / (z - c) ^ (n - x)) / (z - c) := by
       rw [Finset.sum_div]
-      apply Finset.sum_congr rfl
-      intro x hx
-      rw [Finset.mem_range] at hx
-      rw [div_div, ← pow_succ]
-      congr 2
-      omega
+      refine Finset.sum_congr rfl fun x hx ↦ ?_
+      rw [div_div, ← pow_succ, Nat.sub_add_comm (Finset.mem_range.mp hx).le]
     rw [h_dslope, ← add_assoc, add_right_comm, h_alg, h_sum, ← add_div, ← ih, pow_succ, ← div_div]
 
 lemma hasDerivAt_F_pow (m : ℕ) (c x : ℂ) (hx : x ≠ c) :
@@ -211,12 +207,8 @@ lemma rectIntegral_pow_inv_eq_zero {n : ℕ} (hn : 2 ≤ n) (c z w : ℂ)
 
 lemma log_sub_log_neg_eq_pi_I_of_im_pos {z : ℂ} (hz : 0 < z.im) :
     Complex.log z - Complex.log (-z) = ↑Real.pi * I := by
-  rw [log, log, norm_neg]
-  simp only [add_sub_add_left_eq_sub]
-  rw [← sub_mul]
-  congr 1
-  rw [arg_neg_eq_arg_sub_pi_of_im_pos hz]
-  simp_all only [ofReal_sub, sub_sub_cancel]
+  simp only [log, norm_neg, arg_neg_eq_arg_sub_pi_of_im_pos hz, ofReal_sub, sub_mul,
+    add_sub_add_left_eq_sub, sub_sub_cancel]
 
 lemma log_sub_log_neg_eq_neg_pi_I_of_im_neg {z : ℂ} (hz : z.im < 0) :
     Complex.log z - Complex.log (-z) = -(↑Real.pi * I) := by
@@ -301,10 +293,8 @@ lemma rectIntegral_inv_sub_eq_two_pi_I (c z w : ℂ)
       intro x _
       rw [mem_slitPlane_iff]
       right
-      have : ((x : ℂ) - (c - ↑Y * I)).im = Y - c.im := by
-        simp only [sub_im, ofReal_im, mul_im, ofReal_re, I_im, mul_one, I_re, mul_zero, add_zero,
-          zero_sub, neg_sub]
-      rw [this]
+      simp only [sub_im, ofReal_im, mul_im, ofReal_re, I_im, mul_one, I_re, mul_zero, add_zero,
+        zero_sub, neg_sub]
       exact sub_ne_zero.mpr hY
     )
   have h_B := int_horiz z.im (ne_of_lt hz_im)
@@ -318,10 +308,8 @@ lemma rectIntegral_inv_sub_eq_two_pi_I (c z w : ℂ)
       intro y _
       rw [mem_slitPlane_iff]
       left
-      have : ((y : ℂ) * I - (c - ↑w.re)).re = w.re - c.re := by
-        simp only [sub_re, mul_re, ofReal_re, I_re, mul_zero, ofReal_im, I_im, mul_one, sub_self,
-          zero_sub, neg_sub]
-      rw [this]
+      simp only [sub_re, mul_re, ofReal_re, I_re, mul_zero, ofReal_im, I_im, mul_one, sub_self,
+        zero_sub, neg_sub]
       linarith
     )
   have h_L : I * ∫ y in z.im..w.im, 1 / (↑z.re + ↑y * I - c) =
@@ -333,10 +321,8 @@ lemma rectIntegral_inv_sub_eq_two_pi_I (c z w : ℂ)
       intro y _
       rw [mem_slitPlane_iff]
       left
-      have : (-((y : ℂ) * I - (c - ↑z.re))).re = c.re - z.re := by
-        simp only [neg_sub, sub_re, ofReal_re, mul_re, I_re, mul_zero, ofReal_im, I_im, mul_one,
-          sub_self, sub_zero]
-      rw [this]
+      simp only [neg_sub, sub_re, ofReal_re, mul_re, I_re, mul_zero, ofReal_im, I_im, mul_one,
+        sub_self, sub_zero]
       linarith
     )
   unfold rectIntegral
