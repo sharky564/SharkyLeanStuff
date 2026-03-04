@@ -547,7 +547,7 @@ theorem residue_theorem_rect_pole (g : ℂ → ℂ) (n : ℕ) (c z w : ℂ)
       apply ContinuousOn.mul continuousOn_const
       exact continuousOn_inv_pow_bound (m + 1 - k) c z w hc_bound
 
-theorem residue_theorem_rect_poles_finset {ι : Type*} (s : Finset ι)
+theorem residue_theorem_rect_poles_finset_multiple {ι : Type*} (s : Finset ι)
     (c : ι → ℂ) (g : ι → ℂ → ℂ) (n : ι → ℕ) (z w : ℂ)
     (hc_re1 : ∀ i ∈ s, z.re < (c i).re) (hc_re2 : ∀ i ∈ s, (c i).re < w.re)
     (hc_im1 : ∀ i ∈ s, z.im < (c i).im) (hc_im2 : ∀ i ∈ s, (c i).im < w.im)
@@ -575,6 +575,25 @@ theorem residue_theorem_rect_poles_finset {ι : Type*} (s : Finset ι)
       have hc_bound := not_mem_boundaryRect_of_inside
         (hc_re1 i hi) (hc_re2 i hi) (hc_im1 i hi) (hc_im2 i hi)
       exact ne_of_mem_of_not_mem hx hc_bound
+
+theorem residue_theorem_rect_poles_finset {ι : Type*} (s : Finset ι)
+    (c : ι → ℂ) (g : ℂ → ℂ) (n : ι → ℕ) (z w : ℂ)
+    (hc_re1 : ∀ i ∈ s, z.re < (c i).re) (hc_re2 : ∀ i ∈ s, (c i).re < w.re)
+    (hc_im1 : ∀ i ∈ s, z.im < (c i).im) (hc_im2 : ∀ i ∈ s, (c i).im < w.im)
+    (U : Set ℂ) (hU_open : IsOpen U)
+    (h_filled : filledRect z w ⊆ U)
+    (h_holo : DifferentiableOn ℂ g U) :
+    rectIntegral (fun x ↦ ∑ i ∈ s, g x / (x - c i)^(n i)) z w =
+    2 * ↑Real.pi * I * ∑ i ∈ s, residue_pole g (c i) (n i) := by
+  apply residue_theorem_rect_poles_finset_multiple s c (fun _ ↦ g) n z w
+  · exact hc_re1
+  · exact hc_re2
+  · exact hc_im1
+  · exact hc_im2
+  · exact hU_open
+  · exact h_filled
+  · intro _ _
+    exact h_holo
 
 theorem residue_theorem_rect_meromorphic {ι : Type*} (s : Finset ι)
     (H : ℂ → ℂ) (c : ι → ℂ) (g : ι → ℂ → ℂ) (n : ι → ℕ) (z w : ℂ)
@@ -604,8 +623,26 @@ theorem residue_theorem_rect_meromorphic {ι : Type*} (s : Finset ι)
   have hH_zero : rectIntegral H z w = 0 :=
     rectIntegral_eq_zero_of_differentiableOn H z w U hU_open h_filled hH_holo
   rw [hH_zero, zero_add]
-  exact residue_theorem_rect_poles_finset s c g n z w hc_re1 hc_re2 hc_im1
+  exact residue_theorem_rect_poles_finset_multiple s c g n z w hc_re1 hc_re2 hc_im1
     hc_im2 U hU_open h_filled h_holo
+
+theorem residue_theorem_rect_meromorphic' {ι : Type*} (s : Finset ι)
+    (f : ℂ → ℂ) (H : ℂ → ℂ) (c : ι → ℂ) (g : ι → ℂ → ℂ) (n : ι → ℕ) (z w : ℂ)
+    (hc_re1 : ∀ i ∈ s, z.re < (c i).re) (hc_re2 : ∀ i ∈ s, (c i).re < w.re)
+    (hc_im1 : ∀ i ∈ s, z.im < (c i).im) (hc_im2 : ∀ i ∈ s, (c i).im < w.im)
+    (U : Set ℂ) (hU_open : IsOpen U)
+    (h_filled : filledRect z w ⊆ U)
+    (hH_holo : DifferentiableOn ℂ H U)
+    (h_holo : ∀ i ∈ s, DifferentiableOn ℂ (g i) U)
+    (h_eq : ∀ x ∈ boundaryRect z w, f x = H x + ∑ i ∈ s, g i x / (x - c i) ^ (n i)) :
+    rectIntegral f z w =
+      2 * ↑Real.pi * I * ∑ i ∈ s, residue_pole (g i) (c i) (n i) := by
+  have h_decomp := residue_theorem_rect_meromorphic s H c g n z w
+    hc_re1 hc_re2 hc_im1 hc_im2 U hU_open h_filled hH_holo h_holo
+  rw [← h_decomp]
+  apply rectIntegral_congr
+  intro x hx
+  exact h_eq x hx
 
 end Residue
 
