@@ -2,3 +2,4 @@ import ContourIntegral.RectIntegral
 import ContourIntegral.ResidueTheorem
 import ContourIntegral.CosDivSqAddOne
 import ContourIntegral.InvProdSqAddOneSqAddFour
+import ContourIntegral.InvSqAddOneSq
