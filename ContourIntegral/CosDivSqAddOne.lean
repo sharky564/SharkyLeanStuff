@@ -71,7 +71,7 @@ lemma contour_integral (t : ℝ) (R : ℝ) (hR : 1 < R) :
   push_cast at h_pi ⊢
   exact h_pi
 
-lemma norm_f_le {t : ℝ} (ht : 0 ≤ t) {z : ℂ} {R : ℝ} (hR : 1 < R) (hz_im : 0 ≤ z.im)
+lemma norm_integrand_le {t : ℝ} (ht : 0 ≤ t) {z : ℂ} {R : ℝ} (hR : 1 < R) (hz_im : 0 ≤ z.im)
     (hz_norm : R ≤ ‖z‖) : ‖integrand t z‖ ≤ 1 / (R^2 - 1) := by
   unfold integrand
   rw [norm_div]
@@ -124,7 +124,7 @@ lemma limit_right_edge {t : ℝ} (ht : 0 ≤ t) :
   apply tendsto_integral_of_bound_isO (fun _ ↦ 0) (fun R ↦ R)
     (fun R y ↦ integrand t (↑R + ↑y * I)) 1
   · filter_upwards [eventually_gt_atTop 1] with R hR y hy
-    apply norm_f_le ht hR
+    apply norm_integrand_le ht hR
     · simp only [add_im, ofReal_im, mul_im, ofReal_re, I_im, mul_one, I_re, mul_zero, add_zero,
         zero_add]
       rw [mem_uIoc] at hy
@@ -141,7 +141,7 @@ lemma limit_left_edge {t : ℝ} (ht : 0 ≤ t) :
   apply tendsto_integral_of_bound_isO (fun _ ↦ 0) (fun R ↦ R)
     (fun R y ↦ integrand t (-↑R + ↑y * I)) 1
   · filter_upwards [eventually_gt_atTop 1] with R hR y hy
-    apply norm_f_le ht hR
+    apply norm_integrand_le ht hR
     · simp only [add_im, neg_im, ofReal_im, neg_zero, mul_im, ofReal_re, I_im, mul_one, I_re,
         mul_zero, add_zero, zero_add]
       rw [mem_uIoc] at hy
@@ -158,7 +158,7 @@ lemma limit_top_edge {t : ℝ} (ht : 0 ≤ t) :
   apply tendsto_integral_of_bound_isO (fun R ↦ -R) (fun R ↦ R)
     (fun R x ↦ integrand t (↑x + ↑R * I)) 2
   · filter_upwards [eventually_gt_atTop 1] with R hR x _
-    apply norm_f_le ht hR
+    apply norm_integrand_le ht hR
     · simp only [add_im, ofReal_im, mul_im, ofReal_re, I_im, mul_one, I_re, mul_zero, add_zero,
         zero_add]
       linarith
